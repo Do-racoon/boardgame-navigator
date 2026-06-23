@@ -1,0 +1,164 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector", schema: "public")]
+}
+
+// ─── 게임 ─────────────────────────────────────────────────────────────────────
+
+model Game {
+  id           String   @id @default(uuid())
+  titleKo      String   @map("title_ko")
+  titleEn      String?  @map("title_en")
+  description  String?
+  minPlayers   Int      @map("min_players")
+  maxPlayers   Int      @map("max_players")
+  minPlayTime  Int      @map("min_play_time")
+  maxPlayTime  Int      @map("max_play_time")
+  difficulty   Decimal  @db.Decimal(3, 1)
+  releaseYear  Int?     @map("release_year")
+  thumbnailUrl String?  @map("thumbnail_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  genres             GameGenre[]
+  rulebooks          Rulebook[]
+  qaLogs             QaLog[]
+  benchmarkQuestions BenchmarkQuestion[]
+
+  @@map("games")
+}
+
+// ─── 장르 ─────────────────────────────────────────────────────────────────────
+
+model Genre {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+
+  games GameGenre[]
+
+  @@map("genres")
+}
+
+model GameGenre {
+  gameId  String @map("game_id")
+  genreId String @map("genre_id")
+
+  game  Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, genreId])
+  @@map("game_genres")
+}
+
+// ─── 룰북 ─────────────────────────────────────────────────────────────────────
+
+enum RulebookSourceType {
+  PDF
+  IMAGE
+  TEXT
+}
+
+enum RulebookStatus {
+  READY
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+model Rulebook {
+  id         String             @id @default(uuid())
+  gameId     String             @map("game_id")
+  language   String             @default("ko")
+  sourceType RulebookSourceType @map("source_type")
+  fileUrl    String             @map("file_url")
+  textUrl    String?            @map("text_url")
+  version    String?
+  status     RulebookStatus     @default(READY)
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  game   Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  chunks RulebookChunk[]
+
+  @@map("rulebooks")
+}
+
+// ─── 청크 ─────────────────────────────────────────────────────────────────────
+
+model RulebookChunk {
+  id          String                    @id @default(uuid())
+  rulebookId  String                    @map("rulebook_id")
+  pageNumber  Int?                      @map("page_number")
+  chunkIndex  Int                       @map("chunk_index")
+  content     String
+  tokenCount  Int                       @map("token_count")
+  embeddingId String?                   @map("embedding_id")
+  // pgvector 컬럼은 raw SQL 마이그레이션으로 추가 (Prisma 미지원)
+  // ALTER TABLE rulebook_chunks ADD COLUMN embedding vector(3072);
+  createdAt   DateTime                  @default(now()) @map("created_at")
+
+  rulebook Rulebook @relation(fields: [rulebookId], references: [id], onDelete: Cascade)
+
+  @@unique([rulebookId, chunkIndex])
+  @@index([rulebookId])
+  @@map("rulebook_chunks")
+}
+
+// ─── QA 로그 ──────────────────────────────────────────────────────────────────
+
+model QaLog {
+  id                String   @id @default(uuid())
+  sessionId         String   @map("session_id")
+  gameId            String?  @map("game_id")
+  question          String
+  answer            String
+  retrievedChunkIds String[] @map("retrieved_chunk_ids")
+  latencyMs         Int?     @map("latency_ms")
+  modelName         String   @map("model_name")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  game Game? @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([gameId])
+  @@map("qa_logs")
+}
+
+// ─── 벤치마크 ─────────────────────────────────────────────────────────────────
+
+enum BenchmarkDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum BenchmarkCategory {
+  RULE
+  CARD_EFFECT
+  SCORING
+  EXCEPTION
+}
+
+model BenchmarkQuestion {
+  id               String              @id @default(uuid())
+  gameId           String              @map("game_id")
+  question         String
+  expectedAnswer   String              @map("expected_answer")
+  mustInclude      String[]            @map("must_include")
+  mustNotInclude   String[]            @map("must_not_include")
+  expectedChunkIds String[]            @map("expected_chunk_ids")
+  difficulty       BenchmarkDifficulty
+  category         BenchmarkCategory
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@map("benchmark_questions")
+}

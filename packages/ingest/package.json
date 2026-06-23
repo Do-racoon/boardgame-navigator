@@ -1,0 +1,20 @@
+{
+  "name": "@boardgame/ingest",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "ingest": "ts-node --project tsconfig.json src/cli.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.10",
+    "dotenv": "^16.4.7",
+    "openai": "^4.77.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "@types/pdf-parse": "^1.1.5",
+    "pdf-parse": "^2.4.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@boardgame/database",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:seed": "ts-node --project tsconfig.seed.json prisma/seed/seed.ts"
+  },
+  "prisma": {
+    "seed": "ts-node --project tsconfig.seed.json prisma/seed/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.1.0",
+    "fast-xml-parser": "^4.5.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

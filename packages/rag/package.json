@@ -1,0 +1,19 @@
+{
+  "name": "@boardgame/rag",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "create-index": "ts-node src/create-index.ts"
+  },
+  "dependencies": {
+    "@azure/search-documents": "^12.1.0",
+    "openai": "^4.77.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "ts-node": "^10.9.2"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
