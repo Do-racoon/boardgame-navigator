@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 
@@ -20,25 +20,36 @@ export class AdminController {
   deleteSubmission(@Param('id') id: string) { return this.service.deleteSubmission(id) }
 
   @Post('submissions/:id/ingest-test')
-  ingestTest(@Param('id') id: string) { return this.service.ingestTest(id) }
+  async ingestTest(@Param('id') id: string) {
+    try { return await this.service.ingestTest(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
 
   @Post('submissions/:id/publish')
-  publish(@Param('id') id: string) { return this.service.publish(id) }
+  async publish(@Param('id') id: string) {
+    try { return await this.service.publish(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
 
   // ── 게임 ──────────────────────────────────────────────────────────
   @Get('games')
   getGames() { return this.service.getGames() }
 
   @Patch('games/:id')
-  updateGame(@Param('id') id: string, @Body() body: Record<string, unknown>) {
-    return this.service.updateGame(id, body)
+  async updateGame(@Param('id') id: string, @Body() body: Record<string, unknown>) {
+    try { return await this.service.updateGame(id, body) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 
   @Delete('games/:id')
-  deleteGame(@Param('id') id: string) { return this.service.deleteGame(id) }
+  async deleteGame(@Param('id') id: string) {
+    try { return await this.service.deleteGame(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
 
   @Post('games/:id/reingest')
-  reingest(@Param('id') id: string, @Body() body: { fileUrl: string }) {
-    return this.service.reingestGame(id, body.fileUrl)
+  async reingest(@Param('id') id: string, @Body() body: { fileUrl: string }) {
+    try { return await this.service.reingestGame(id, body.fileUrl) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 }
