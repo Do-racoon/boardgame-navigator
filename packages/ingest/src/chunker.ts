@@ -7,8 +7,8 @@ export interface Chunk {
   tokenCount: number
 }
 
-const TARGET_TOKENS = 500
-const OVERLAP_TOKENS = 100
+const TARGET_TOKENS = 200
+const OVERLAP_TOKENS = 50
 // 한글/영문 혼합 기준 토큰 근사: 글자수 / 2.5
 const CHARS_PER_TOKEN = 2.5
 

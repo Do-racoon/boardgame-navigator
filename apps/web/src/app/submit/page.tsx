@@ -41,6 +41,7 @@ export default function SubmitPage() {
     data.append('difficulty', String(difficulty))
     data.append('genres', JSON.stringify(selectedGenres))
     data.append('rulebookType', rulebookType)
+    data.append('description', (form.elements.namedItem('description') as HTMLTextAreaElement).value)
     data.append('submitterEmail', (form.elements.namedItem('submitterEmail') as HTMLInputElement).value)
 
     if (rulebookType === 'TEXT') {
@@ -168,6 +169,17 @@ export default function SubmitPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 게임 소개 */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">게임 소개 (선택)</label>
+            <textarea
+              name="description"
+              rows={3}
+              placeholder="게임의 간단한 소개나 특징을 적어주세요..."
+              className="w-full rounded border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
+            />
           </div>
         </section>
 

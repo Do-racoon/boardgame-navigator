@@ -10,6 +10,7 @@ export interface CreateSubmissionDto {
   maxPlayTime?: number | undefined
   difficulty?: number | undefined
   genres: string[]
+  description?: string | undefined
   rulebookType: 'PDF' | 'IMAGE' | 'TEXT'
   rulebookText?: string | undefined
   submitterEmail?: string | undefined
@@ -48,6 +49,7 @@ export class SubmissionsService {
         min_play_time: dto.minPlayTime,
         max_play_time: dto.maxPlayTime,
         difficulty: dto.difficulty,
+        description: dto.description,
         genres: dto.genres,
         rulebook_type: dto.rulebookType,
         rulebook_url: rulebookUrl,

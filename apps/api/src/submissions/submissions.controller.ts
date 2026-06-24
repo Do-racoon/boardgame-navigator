@@ -34,6 +34,7 @@ export class SubmissionsController {
       minPlayTime: body['minPlayTime'] ? Number(body['minPlayTime']) : undefined,
       maxPlayTime: body['maxPlayTime'] ? Number(body['maxPlayTime']) : undefined,
       difficulty: body['difficulty'] ? Number(body['difficulty']) : undefined,
+      description: body['description'],
       genres,
       rulebookType,
       rulebookText: body['rulebookText'],

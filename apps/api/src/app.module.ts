@@ -6,6 +6,7 @@ import { RulebooksModule } from './rulebooks/rulebooks.module'
 import { RagModule } from './rag/rag.module'
 import { BenchmarkModule } from './benchmark/benchmark.module'
 import { SubmissionsModule } from './submissions/submissions.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { SubmissionsModule } from './submissions/submissions.module'
     RagModule,
     BenchmarkModule,
     SubmissionsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

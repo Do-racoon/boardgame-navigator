@@ -25,6 +25,15 @@ export class AzureOpenAiService {
     return res.data[0]!.embedding
   }
 
+  async embedBatch(texts: string[]): Promise<number[][]> {
+    const res = await this.client.embeddings.create({
+      model: this.embeddingModel,
+      input: texts,
+      dimensions: 1536,
+    })
+    return res.data.map(d => d.embedding)
+  }
+
   async *streamChat(systemPrompt: string, userMessage: string): AsyncIterable<string> {
     const stream = await this.client.chat.completions.create({
       model: this.chatModel,

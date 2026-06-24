@@ -42,7 +42,7 @@ export class RagController {
     @Body() dto: AskDto,
   ) {
     const vector = await this.openai.embed(dto.question)
-    const chunks = await this.vectorSearch.similaritySearch(vector, gameId, 5)
+    const chunks = await this.vectorSearch.similaritySearch(vector, gameId, 2)
     return chunks.map((c) => ({
       id: c.id,
       pageNumber: c.pageNumber,
