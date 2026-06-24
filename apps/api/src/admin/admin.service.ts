@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
+import { randomUUID } from 'crypto'
 import { SupabaseService } from '../database/supabase.service'
 import { AdminIngestService } from './admin-ingest.service'
 
@@ -49,7 +50,7 @@ export class AdminService {
     } else {
       const { data: newGame, error: createErr } = await this.supabase.client
         .from('games')
-        .insert({ title_ko: testTitle, genres: [] })
+        .insert({ id: randomUUID(), title_ko: testTitle, genres: [] })
         .select('id').single()
       if (createErr) throw new Error(`임시 게임 생성 실패: ${createErr.message}`)
       gameId = newGame.id as string
@@ -65,6 +66,7 @@ export class AdminService {
     const { data: game, error: gameError } = await this.supabase.client
       .from('games')
       .insert({
+        id: randomUUID(),
         title_ko: sub.title_ko,
         title_en: sub.title_en ?? null,
         description: sub.description ?? null,
