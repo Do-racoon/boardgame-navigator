@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SupabaseService } from '../database/supabase.service'
 import { AzureOpenAiService } from '../rag/azure-openai.service'
-import { PDFParse } from 'pdf-parse'
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string; numpages: number }>
 
 const TARGET_TOKENS = 200
 const CHARS_PER_TOKEN = 2.5
@@ -55,12 +56,14 @@ function chunkPages(pages: { page: number; text: string }[]): Chunk[] {
 }
 
 async function parsePdf(buffer: Buffer): Promise<{ page: number; text: string }[]> {
-  const uint8 = new Uint8Array(buffer)
-  const parser = new PDFParse(uint8)
-  const result = await parser.getText()
-  return (result.pages as { num: number; text: string }[])
-    .map(p => ({ page: p.num, text: p.text.replace(/\s+/g, ' ').trim() }))
-    .filter(p => p.text.length > 10)
+  const result = await pdfParse(buffer)
+  // v1 returns full text; split into pseudo-pages by form-feed or chunk evenly
+  const pages = result.text.split(/\f/).filter((t: string) => t.trim().length > 10)
+  if (pages.length > 1) {
+    return pages.map((text: string, i: number) => ({ page: i + 1, text: text.replace(/\s+/g, ' ').trim() }))
+  }
+  // fallback: treat whole text as page 1
+  return [{ page: 1, text: result.text.replace(/\s+/g, ' ').trim() }]
 }
 
 @Injectable()

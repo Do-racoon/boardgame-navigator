@@ -142,12 +142,10 @@ export class AdminService {
     let newText = ''
 
     if (file) {
-      // PDF에서 텍스트 추출
-      const { PDFParse } = await import('pdf-parse')
-      const uint8 = new Uint8Array(file.buffer)
-      const parser = new PDFParse(uint8)
-      const result = await parser.getText()
-      newText = (result.pages as { text: string }[]).map(p => p.text).join('\n').replace(/\s+/g, ' ').trim()
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
+      const result = await pdfParse(file.buffer)
+      newText = result.text.replace(/\s+/g, ' ').trim()
     }
 
     const { data: game } = await this.supabase.client.from('games').select('extra_rules').eq('id', gameId).single()
