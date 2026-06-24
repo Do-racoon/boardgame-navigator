@@ -1,21 +1,22 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
-RUN npm install -g pnpm
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.base.json ./
 COPY apps/api ./apps/api
 COPY packages ./packages
 
-RUN pnpm install --frozen-lockfile
+RUN corepack enable && pnpm install --frozen-lockfile
 RUN pnpm --filter @boardgame/api build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
-RUN npm install -g pnpm
 
+RUN corepack enable
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/api/package.json ./apps/api/
+COPY packages/database/package.json ./packages/database/
 COPY packages/ingest/package.json ./packages/ingest/
+
 RUN pnpm install --frozen-lockfile --prod
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
