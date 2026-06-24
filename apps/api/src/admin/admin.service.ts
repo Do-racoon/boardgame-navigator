@@ -50,7 +50,7 @@ export class AdminService {
     } else {
       const { data: newGame, error: createErr } = await this.supabase.client
         .from('games')
-        .insert({ id: randomUUID(), title_ko: testTitle, genres: [] })
+        .insert({ id: randomUUID(), title_ko: testTitle, genres: [], min_players: 1, max_players: 99, min_play_time: 1, max_play_time: 999 })
         .select('id').single()
       if (createErr) throw new Error(`임시 게임 생성 실패: ${createErr.message}`)
       gameId = newGame.id as string
@@ -70,10 +70,10 @@ export class AdminService {
         title_ko: sub.title_ko,
         title_en: sub.title_en ?? null,
         description: sub.description ?? null,
-        min_players: sub.min_players ?? null,
-        max_players: sub.max_players ?? null,
-        min_play_time: sub.min_play_time ?? null,
-        max_play_time: sub.max_play_time ?? null,
+        min_players: sub.min_players ?? 1,
+        max_players: sub.max_players ?? 99,
+        min_play_time: sub.min_play_time ?? 1,
+        max_play_time: sub.max_play_time ?? 999,
         difficulty: sub.difficulty ?? null,
         genres: sub.genres ?? [],
       })
