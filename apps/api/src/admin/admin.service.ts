@@ -28,20 +28,23 @@ export class AdminService {
     if (error) throw new Error(error.message)
   }
 
+  async deleteSubmission(id: string) {
+    const { error } = await this.supabase.client.from('game_submissions').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return { deleted: true }
+  }
+
   async ingestTest(submissionId: string): Promise<{ gameId: string; chunks: number }> {
     const sub = await this.getSubmission(submissionId)
     if (!sub.rulebook_url) throw new Error('룰북 파일이 없습니다')
-
     const gameId = `test_${submissionId}`
-    const rulebookId = `${gameId}-ko`
-    const result = await this.ingest.ingestFromUrl(rulebookId, gameId, sub.rulebook_url)
+    const result = await this.ingest.ingestFromUrl(`${gameId}-ko`, gameId, sub.rulebook_url as string)
     return { gameId, chunks: result.chunks }
   }
 
-  async publish(submissionId: string): Promise<{ gameId: string }> {
+  async publish(submissionId: string): Promise<{ gameId: string; chunks: number }> {
     const sub = await this.getSubmission(submissionId)
 
-    // 게임 INSERT
     const { data: game, error: gameError } = await this.supabase.client
       .from('games')
       .insert({
@@ -60,33 +63,24 @@ export class AdminService {
     if (gameError) throw new Error(`게임 등록 실패: ${gameError.message}`)
     const gameId: string = game.id
 
-    // ingest (파일이 있는 경우)
+    let chunks = 0
     if (sub.rulebook_url) {
-      const rulebookId = `${gameId}-ko`
-      await this.ingest.ingestFromUrl(rulebookId, gameId, sub.rulebook_url)
+      const result = await this.ingest.ingestFromUrl(`${gameId}-ko`, gameId, sub.rulebook_url as string)
+      chunks = result.chunks
     } else if (sub.rulebook_text) {
-      // 텍스트 제출의 경우 룰북만 저장 (임베딩 없이)
       await this.supabase.client.rpc('upsert_rulebook', {
-        p_id: `${gameId}-ko`,
-        p_game_id: gameId,
-        p_language: 'ko',
-        p_source_type: 'TEXT',
-        p_file_url: '',
-        p_status: 'INDEXED',
+        p_id: `${gameId}-ko`, p_game_id: gameId, p_language: 'ko',
+        p_source_type: 'TEXT', p_file_url: '', p_status: 'INDEXED',
       })
     }
 
-    // 신청 완료 처리
     await this.updateSubmissionStatus(submissionId, 'DONE')
-    return { gameId }
+    return { gameId, chunks }
   }
 
   private async getSubmission(id: string) {
     const { data, error } = await this.supabase.client
-      .from('game_submissions')
-      .select('*')
-      .eq('id', id)
-      .single()
+      .from('game_submissions').select('*').eq('id', id).single()
     if (error || !data) throw new NotFoundException('신청을 찾을 수 없습니다')
     return data
   }
@@ -103,14 +97,21 @@ export class AdminService {
   }
 
   async updateGame(id: string, dto: Record<string, unknown>) {
-    const allowed = ['title_ko', 'title_en', 'description', 'min_players', 'max_players', 'min_play_time', 'max_play_time', 'difficulty', 'genres']
+    const allowed = ['title_ko', 'title_en', 'description', 'extra_rules', 'min_players', 'max_players', 'min_play_time', 'max_play_time', 'difficulty', 'genres']
     const update = Object.fromEntries(Object.entries(dto).filter(([k]) => allowed.includes(k)))
     const { error } = await this.supabase.client.from('games').update(update).eq('id', id)
     if (error) throw new Error(error.message)
   }
 
+  async deleteGame(id: string) {
+    await this.supabase.client.from('rulebook_chunks').delete().eq('game_id', id)
+    await this.supabase.client.from('rulebooks').delete().eq('game_id', id)
+    const { error } = await this.supabase.client.from('games').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+    return { deleted: true }
+  }
+
   async reingestGame(gameId: string, fileUrl: string): Promise<{ chunks: number }> {
-    const rulebookId = `${gameId}-ko`
-    return this.ingest.ingestFromUrl(rulebookId, gameId, fileUrl)
+    return this.ingest.ingestFromUrl(`${gameId}-ko`, gameId, fileUrl)
   }
 }

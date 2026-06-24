@@ -42,15 +42,21 @@ export class RagService {
     const triples = await this.graphSearch.getSubgraph(gameId, entityIds)
     const graphContext = this.graphSearch.formatAsContext(triples)
 
-    // 3. 프롬프트 조립
+    // 3. 추가 룰 조회
+    const { data: gameData } = await this.supabase.client
+      .from('games').select('extra_rules').eq('id', gameId).maybeSingle()
+    const extraRules: string | null = gameData?.extra_rules ?? null
+
+    // 4. 프롬프트 조립
     const chunkContext = this.buildContext(chunks)
     const userMessage = [
       `[룰북 내용]\n${chunkContext}`,
       graphContext ? `\n${graphContext}` : '',
+      extraRules ? `\n[추가 룰/주의사항]\n${extraRules}` : '',
       `\n[질문]\n${question}`,
     ].join('\n')
 
-    // 4. 스트리밍 답변
+    // 5. 스트리밍 답변
     let fullAnswer = ''
     for await (const token of this.openai.streamChat(SYSTEM_PROMPT, userMessage)) {
       fullAnswer += token

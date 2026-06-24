@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 
@@ -16,6 +16,9 @@ export class AdminController {
     return this.service.updateSubmissionStatus(id, body.status, body.adminNote)
   }
 
+  @Delete('submissions/:id')
+  deleteSubmission(@Param('id') id: string) { return this.service.deleteSubmission(id) }
+
   @Post('submissions/:id/ingest-test')
   ingestTest(@Param('id') id: string) { return this.service.ingestTest(id) }
 
@@ -30,6 +33,9 @@ export class AdminController {
   updateGame(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     return this.service.updateGame(id, body)
   }
+
+  @Delete('games/:id')
+  deleteGame(@Param('id') id: string) { return this.service.deleteGame(id) }
 
   @Post('games/:id/reingest')
   reingest(@Param('id') id: string, @Body() body: { fileUrl: string }) {
