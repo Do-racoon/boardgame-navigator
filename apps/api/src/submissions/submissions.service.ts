@@ -27,13 +27,13 @@ export class SubmissionsService {
       const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
 
       const { error: uploadError } = await this.supabase.client.storage
-        .from('game-submissions')
+        .from('rulebook-submissions')
         .upload(path, file.buffer, { contentType: file.mimetype })
 
       if (uploadError) throw new Error(`파일 업로드 실패: ${uploadError.message}`)
 
       const { data } = this.supabase.client.storage
-        .from('game-submissions')
+        .from('rulebook-submissions')
         .getPublicUrl(path)
       rulebookUrl = data.publicUrl
     }
