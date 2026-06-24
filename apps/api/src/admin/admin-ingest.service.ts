@@ -1,8 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { SupabaseService } from '../database/supabase.service'
 import { AzureOpenAiService } from '../rag/azure-openai.service'
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const PDFParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
+import { PDFParse } from 'pdf-parse'
 
 const TARGET_TOKENS = 200
 const CHARS_PER_TOKEN = 2.5
@@ -55,6 +54,15 @@ function chunkPages(pages: { page: number; text: string }[]): Chunk[] {
   return chunks
 }
 
+async function parsePdf(buffer: Buffer): Promise<{ page: number; text: string }[]> {
+  const uint8 = new Uint8Array(buffer)
+  const parser = new PDFParse(uint8)
+  const result = await parser.getText()
+  return (result.pages as { num: number; text: string }[])
+    .map(p => ({ page: p.num, text: p.text.replace(/\s+/g, ' ').trim() }))
+    .filter(p => p.text.length > 10)
+}
+
 @Injectable()
 export class AdminIngestService {
   private readonly logger = new Logger(AdminIngestService.name)
@@ -65,53 +73,33 @@ export class AdminIngestService {
   ) {}
 
   async ingestFromUrl(rulebookId: string, gameId: string, fileUrl: string): Promise<{ chunks: number }> {
-    this.logger.log(`Ingest 시작: gameId=${gameId}, rulebookId=${rulebookId}`)
+    this.logger.log(`Ingest 시작: gameId=${gameId}`)
 
-    // 1. 파일 다운로드 (Supabase Storage 경유 또는 직접 URL)
     const buffer = await this.downloadFile(fileUrl)
-
-    // 2. PDF 파싱
-    const pdf = await PDFParse(buffer)
-    const pageTexts = pdf.text.split('\n\n').map((t: string, i: number) => ({ page: i + 1, text: t.trim() })).filter((p: { text: string }) => p.text.length > 10)
+    const pageTexts = await parsePdf(buffer)
     this.logger.log(`PDF 파싱 완료: ${pageTexts.length}페이지`)
 
-    // 3. 청킹
     const chunks = chunkPages(pageTexts)
     this.logger.log(`청킹 완료: ${chunks.length}개`)
 
-    // 4. 기존 청크 삭제
     await this.supabase.client.from('rulebook_chunks').delete().eq('game_id', gameId)
 
-    // 5. 룰북 레코드 upsert
     await this.supabase.client.rpc('upsert_rulebook', {
-      p_id: rulebookId,
-      p_game_id: gameId,
-      p_language: 'ko',
-      p_source_type: 'PDF',
-      p_file_url: fileUrl,
-      p_status: 'PROCESSING',
+      p_id: rulebookId, p_game_id: gameId, p_language: 'ko',
+      p_source_type: 'PDF', p_file_url: fileUrl, p_status: 'PROCESSING',
     })
 
-    // 6. 임베딩 + 저장 (배치)
     for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
       const batch = chunks.slice(i, i + BATCH_SIZE)
-      const texts = batch.map(c => c.content)
-      const embeddings = await this.openai.embedBatch(texts)
-
+      const embeddings = await this.openai.embedBatch(batch.map(c => c.content))
       for (let j = 0; j < batch.length; j++) {
         const chunk = batch[j]!
-        const embedding = embeddings[j]!
         const id = `${rulebookId}_${String(chunk.chunkIndex).padStart(4, '0')}`
         const { error } = await this.supabase.client.rpc('upsert_chunk', {
-          p_id: id,
-          p_rulebook_id: rulebookId,
-          p_game_id: gameId,
-          p_page_number: chunk.pageNumber,
-          p_chunk_index: chunk.chunkIndex,
-          p_content: chunk.content,
-          p_token_count: chunk.tokenCount,
-          p_embedding_id: id,
-          p_embedding: embedding,
+          p_id: id, p_rulebook_id: rulebookId, p_game_id: gameId,
+          p_page_number: chunk.pageNumber, p_chunk_index: chunk.chunkIndex,
+          p_content: chunk.content, p_token_count: chunk.tokenCount,
+          p_embedding_id: id, p_embedding: embeddings[j]!,
         })
         if (error) throw new Error(`청크 저장 실패: ${error.message}`)
       }
@@ -122,8 +110,35 @@ export class AdminIngestService {
     return { chunks: chunks.length }
   }
 
+  async ingestFromBuffer(rulebookId: string, gameId: string, buffer: Buffer, fileUrl: string): Promise<{ chunks: number }> {
+    const pageTexts = await parsePdf(buffer)
+    this.logger.log(`PDF 파싱 완료: ${pageTexts.length}페이지`)
+    const chunks = chunkPages(pageTexts)
+    await this.supabase.client.from('rulebook_chunks').delete().eq('game_id', gameId)
+    await this.supabase.client.rpc('upsert_rulebook', {
+      p_id: rulebookId, p_game_id: gameId, p_language: 'ko',
+      p_source_type: 'PDF', p_file_url: fileUrl, p_status: 'PROCESSING',
+    })
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batch = chunks.slice(i, i + BATCH_SIZE)
+      const embeddings = await this.openai.embedBatch(batch.map(c => c.content))
+      for (let j = 0; j < batch.length; j++) {
+        const chunk = batch[j]!
+        const id = `${rulebookId}_${String(chunk.chunkIndex).padStart(4, '0')}`
+        const { error } = await this.supabase.client.rpc('upsert_chunk', {
+          p_id: id, p_rulebook_id: rulebookId, p_game_id: gameId,
+          p_page_number: chunk.pageNumber, p_chunk_index: chunk.chunkIndex,
+          p_content: chunk.content, p_token_count: chunk.tokenCount,
+          p_embedding_id: id, p_embedding: embeddings[j]!,
+        })
+        if (error) throw new Error(`청크 저장 실패: ${error.message}`)
+      }
+    }
+    await this.supabase.client.from('rulebooks').update({ status: 'INDEXED' }).eq('id', rulebookId)
+    return { chunks: chunks.length }
+  }
+
   private async downloadFile(fileUrl: string): Promise<Buffer> {
-    // Supabase Storage URL인 경우 storage path를 추출해서 download API 사용
     const storageMatch = fileUrl.match(/\/storage\/v1\/object\/(?:public\/)?([^/]+)\/(.+)$/)
     if (storageMatch) {
       const bucket = storageMatch[1]!
@@ -132,8 +147,6 @@ export class AdminIngestService {
       if (error) throw new Error(`Storage 다운로드 실패: ${error.message}`)
       return Buffer.from(await data.arrayBuffer())
     }
-
-    // 일반 URL의 경우 직접 fetch
     const res = await fetch(fileUrl)
     if (!res.ok) throw new Error(`파일 다운로드 실패: ${res.status}`)
     return Buffer.from(await res.arrayBuffer())

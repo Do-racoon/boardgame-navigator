@@ -123,14 +123,39 @@ export class AdminService {
   }
 
   async deleteGame(id: string) {
+    // 관련 데이터 모두 삭제 (FK 순서 준수)
+    await this.supabase.client.from('entities').delete().eq('game_id', id)
+    await this.supabase.client.from('relationships').delete().eq('game_id', id)
+    await this.supabase.client.from('qa_logs').delete().eq('game_id', id)
     await this.supabase.client.from('rulebook_chunks').delete().eq('game_id', id)
     await this.supabase.client.from('rulebooks').delete().eq('game_id', id)
     const { error } = await this.supabase.client.from('games').delete().eq('id', id)
-    if (error) throw new Error(error.message)
+    if (error) throw new Error(`게임 삭제 실패: ${error.message}`)
     return { deleted: true }
   }
 
   async reingestGame(gameId: string, fileUrl: string): Promise<{ chunks: number }> {
     return this.ingest.ingestFromUrl(`${gameId}-ko`, gameId, fileUrl)
+  }
+
+  async uploadExtraRules(gameId: string, mode: 'replace' | 'append', file?: Express.Multer.File): Promise<{ extraRules: string }> {
+    let newText = ''
+
+    if (file) {
+      // PDF에서 텍스트 추출
+      const { PDFParse } = await import('pdf-parse')
+      const uint8 = new Uint8Array(file.buffer)
+      const parser = new PDFParse(uint8)
+      const result = await parser.getText()
+      newText = (result.pages as { text: string }[]).map(p => p.text).join('\n').replace(/\s+/g, ' ').trim()
+    }
+
+    const { data: game } = await this.supabase.client.from('games').select('extra_rules').eq('id', gameId).single()
+    const existing: string = game?.extra_rules ?? ''
+    const extraRules = mode === 'append' && existing ? `${existing}\n\n${newText}` : newText
+
+    const { error } = await this.supabase.client.from('games').update({ extra_rules: extraRules }).eq('id', gameId)
+    if (error) throw new Error(error.message)
+    return { extraRules }
   }
 }

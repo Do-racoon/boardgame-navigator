@@ -381,6 +381,9 @@ function GamesTab() {
   const [reingesting, setReingesting] = useState(false)
   const [showChat, setShowChat] = useState(false)
   const [msg, setMsg] = useState('')
+  const [rulesMode, setRulesMode] = useState<'replace' | 'append'>('replace')
+  const [rulesFile, setRulesFile] = useState<File | null>(null)
+  const [uploadingRules, setUploadingRules] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch(`${BASE_URL}/admin/games`)
@@ -390,7 +393,7 @@ function GamesTab() {
 
   function selectGame(game: Game) {
     setSelected(game); setShowChat(false); setMsg('')
-    setReingestUrl('')
+    setReingestUrl(''); setRulesFile(null)
     setEditForm({
       title_ko: game.title_ko ?? '', title_en: game.title_en ?? '',
       description: game.description ?? '', extra_rules: game.extra_rules ?? '',
@@ -442,6 +445,23 @@ function GamesTab() {
       setShowChat(true)
     } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
     finally { setReingesting(false) }
+  }
+
+  async function handleUploadRules() {
+    if (!selected || !rulesFile) return
+    setUploadingRules(true); setMsg('')
+    try {
+      const fd = new FormData()
+      fd.append('file', rulesFile)
+      fd.append('mode', rulesMode)
+      const res = await fetch(`${BASE_URL}/admin/games/${selected.id}/upload-rules`, { method: 'POST', body: fd })
+      if (!res.ok) { const e = await res.json() as { message: string }; throw new Error(e.message) }
+      const data = await res.json() as { extraRules: string }
+      set('extra_rules', data.extraRules)
+      setRulesFile(null)
+      setMsg(`✅ 추가 룰 업로드 완료`)
+    } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
+    finally { setUploadingRules(false) }
   }
 
   return (
@@ -561,6 +581,30 @@ function GamesTab() {
               {showChat ? '채팅 숨기기' : '💬 채팅 테스트 열기'}
             </button>
             {showChat && <TestChat gameId={selected.id} />}
+          </div>
+
+          {/* 추가 룰 PDF 업로드 */}
+          <div className="rounded-lg border bg-white p-4 space-y-2">
+            <p className="text-xs font-medium text-gray-600">추가 룰 / 주의사항 PDF 업로드</p>
+            <p className="text-xs text-gray-400">PDF를 업로드하면 텍스트를 추출해 추가 룰 필드에 반영합니다.</p>
+            <div className="flex gap-2">
+              {(['replace', 'append'] as const).map(m => (
+                <button key={m} type="button" onClick={() => setRulesMode(m)}
+                  className={`flex-1 rounded border py-1 text-xs transition-colors ${rulesMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
+                  {m === 'replace' ? '덮어쓰기' : '이어붙이기'}
+                </button>
+              ))}
+            </div>
+            <label className="block">
+              <span className="sr-only">PDF 파일 선택</span>
+              <input type="file" accept=".pdf" onChange={e => setRulesFile(e.target.files?.[0] ?? null)}
+                className="block w-full text-xs text-gray-500 file:mr-2 file:rounded file:border-0 file:bg-indigo-50 file:px-2 file:py-1 file:text-xs file:text-indigo-700 hover:file:bg-indigo-100" />
+            </label>
+            {rulesFile && <p className="text-xs text-gray-500">선택된 파일: {rulesFile.name}</p>}
+            <button onClick={() => void handleUploadRules()} disabled={uploadingRules || !rulesFile}
+              className="w-full rounded border border-purple-300 py-1.5 text-sm text-purple-700 hover:bg-purple-50 disabled:opacity-40">
+              {uploadingRules ? '⏳ 업로드 중...' : '📄 추가 룰 업로드'}
+            </button>
           </div>
         </div>
       )}

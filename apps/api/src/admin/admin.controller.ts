@@ -1,4 +1,9 @@
-import { Body, Controller, Delete, Get, InternalServerErrorException, Param, Patch, Post } from '@nestjs/common'
+import {
+  Body, Controller, Delete, Get, InternalServerErrorException,
+  Param, Patch, Post, UploadedFile, UseInterceptors,
+} from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { ApiTags } from '@nestjs/swagger'
 import { AdminService } from './admin.service'
 
@@ -17,7 +22,10 @@ export class AdminController {
   }
 
   @Delete('submissions/:id')
-  deleteSubmission(@Param('id') id: string) { return this.service.deleteSubmission(id) }
+  async deleteSubmission(@Param('id') id: string) {
+    try { return await this.service.deleteSubmission(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
 
   @Post('submissions/:id/ingest-test')
   async ingestTest(@Param('id') id: string) {
@@ -50,6 +58,17 @@ export class AdminController {
   @Post('games/:id/reingest')
   async reingest(@Param('id') id: string, @Body() body: { fileUrl: string }) {
     try { return await this.service.reingestGame(id, body.fileUrl) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
+
+  @Post('games/:id/upload-rules')
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }))
+  async uploadRules(
+    @Param('id') id: string,
+    @Body() body: { mode: 'replace' | 'append' },
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    try { return await this.service.uploadExtraRules(id, body.mode ?? 'replace', file) }
     catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 }
