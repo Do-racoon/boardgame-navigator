@@ -1,6 +1,6 @@
 import {
   Controller, Post, Get, Patch, Body, Param,
-  UploadedFile, UseInterceptors, BadRequestException,
+  UploadedFile, UseInterceptors, BadRequestException, InternalServerErrorException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
@@ -26,7 +26,7 @@ export class SubmissionsController {
 
     const genres = body['genres'] ? JSON.parse(body['genres']) : []
 
-    return this.service.create({
+    try { return await this.service.create({
       titleKo: body['titleKo'],
       titleEn: body['titleEn'],
       minPlayers: body['minPlayers'] ? Number(body['minPlayers']) : undefined,
@@ -38,7 +38,7 @@ export class SubmissionsController {
       rulebookType,
       rulebookText: body['rulebookText'],
       submitterEmail: body['submitterEmail'],
-    }, file)
+    }, file) } catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 
   @Get()
