@@ -67,10 +67,8 @@ export class AdminIngestService {
   async ingestFromUrl(rulebookId: string, gameId: string, fileUrl: string): Promise<{ chunks: number }> {
     this.logger.log(`Ingest 시작: gameId=${gameId}, rulebookId=${rulebookId}`)
 
-    // 1. 파일 다운로드
-    const res = await fetch(fileUrl)
-    if (!res.ok) throw new Error(`파일 다운로드 실패: ${res.status}`)
-    const buffer = Buffer.from(await res.arrayBuffer())
+    // 1. 파일 다운로드 (Supabase Storage 경유 또는 직접 URL)
+    const buffer = await this.downloadFile(fileUrl)
 
     // 2. PDF 파싱
     const pdf = await PDFParse(buffer)
@@ -122,5 +120,22 @@ export class AdminIngestService {
     await this.supabase.client.from('rulebooks').update({ status: 'INDEXED' }).eq('id', rulebookId)
     this.logger.log(`Ingest 완료: ${chunks.length}개 청크`)
     return { chunks: chunks.length }
+  }
+
+  private async downloadFile(fileUrl: string): Promise<Buffer> {
+    // Supabase Storage URL인 경우 storage path를 추출해서 download API 사용
+    const storageMatch = fileUrl.match(/\/storage\/v1\/object\/(?:public\/)?([^/]+)\/(.+)$/)
+    if (storageMatch) {
+      const bucket = storageMatch[1]!
+      const path = storageMatch[2]!
+      const { data, error } = await this.supabase.client.storage.from(bucket).download(path)
+      if (error) throw new Error(`Storage 다운로드 실패: ${error.message}`)
+      return Buffer.from(await data.arrayBuffer())
+    }
+
+    // 일반 URL의 경우 직접 fetch
+    const res = await fetch(fileUrl)
+    if (!res.ok) throw new Error(`파일 다운로드 실패: ${res.status}`)
+    return Buffer.from(await res.arrayBuffer())
   }
 }
