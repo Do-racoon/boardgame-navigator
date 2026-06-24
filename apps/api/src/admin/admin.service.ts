@@ -37,7 +37,24 @@ export class AdminService {
   async ingestTest(submissionId: string): Promise<{ gameId: string; chunks: number }> {
     const sub = await this.getSubmission(submissionId)
     if (!sub.rulebook_url) throw new Error('룰북 파일이 없습니다')
-    const gameId = `test_${submissionId}`
+
+    // 기존 테스트 게임 조회 또는 신규 생성
+    const testTitle = `[테스트] ${sub.title_ko as string}`
+    let gameId: string
+    const { data: existing } = await this.supabase.client
+      .from('games').select('id').eq('title_ko', testTitle).maybeSingle()
+
+    if (existing) {
+      gameId = existing.id as string
+    } else {
+      const { data: newGame, error: createErr } = await this.supabase.client
+        .from('games')
+        .insert({ title_ko: testTitle, genres: [] })
+        .select('id').single()
+      if (createErr) throw new Error(`임시 게임 생성 실패: ${createErr.message}`)
+      gameId = newGame.id as string
+    }
+
     const result = await this.ingest.ingestFromUrl(`${gameId}-ko`, gameId, sub.rulebook_url as string)
     return { gameId, chunks: result.chunks }
   }
