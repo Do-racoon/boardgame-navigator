@@ -3,6 +3,7 @@ import {
   UploadedFile, UseInterceptors, BadRequestException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { memoryStorage } from 'multer'
 import { ApiTags, ApiConsumes } from '@nestjs/swagger'
 import { SubmissionsService } from './submissions.service'
 
@@ -13,7 +14,7 @@ export class SubmissionsController {
 
   @Post()
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } }))
   async create(
     @Body() body: Record<string, string>,
     @UploadedFile() file?: Express.Multer.File,
