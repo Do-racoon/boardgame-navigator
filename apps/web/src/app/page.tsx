@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { fetchGames } from '@/lib/api'
 
-interface SearchParams { q?: string; minPlayers?: string; maxPlayers?: string; maxPlayTime?: string }
+interface SearchParams { q?: string; minPlayers?: string; maxPlayers?: string; maxPlayTime?: string; [key: string]: string | undefined }
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
