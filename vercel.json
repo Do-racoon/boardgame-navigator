@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm --filter @boardgame/web build",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "pnpm build",
   "outputDirectory": ".next",
-  "installCommand": "pnpm install",
   "framework": "nextjs"
 }
