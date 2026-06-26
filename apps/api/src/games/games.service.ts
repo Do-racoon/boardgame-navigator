@@ -12,6 +12,7 @@ export class GamesService {
     let query = this.supabase.client
       .from('games')
       .select('*', { count: 'exact' })
+      .is('deleted_at', null)
       .range((page - 1) * limit, page * limit - 1)
       .order('title_ko')
 

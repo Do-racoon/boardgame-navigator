@@ -16,9 +16,9 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
         {game.title_en && <p className="text-gray-500">{game.title_en}</p>}
 
         <div className="mt-4 flex flex-wrap gap-2">
-          {game.genres?.map((gg: { genre: { id: string; name: string } }) => (
-            <span key={gg.genre.id} className="rounded-full bg-indigo-100 px-3 py-1 text-xs text-indigo-700">
-              {gg.genre.name}
+          {(game.genres as string[] | null)?.map((g) => (
+            <span key={g} className="rounded-full bg-indigo-100 px-3 py-1 text-xs text-indigo-700">
+              {g}
             </span>
           ))}
         </div>
