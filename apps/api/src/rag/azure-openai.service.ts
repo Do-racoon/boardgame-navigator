@@ -34,6 +34,20 @@ export class AzureOpenAiService {
     return res.data.map(d => d.embedding)
   }
 
+  async chat(systemPrompt: string, userMessage: string, maxTokens = 400): Promise<string> {
+    const res = await this.client.chat.completions.create({
+      model: this.chatModel,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0,
+      max_tokens: maxTokens,
+      response_format: { type: 'json_object' },
+    })
+    return res.choices[0]?.message?.content ?? '{}'
+  }
+
   async *streamChat(systemPrompt: string, userMessage: string): AsyncIterable<string> {
     const stream = await this.client.chat.completions.create({
       model: this.chatModel,
