@@ -6,8 +6,20 @@ import { SupabaseService } from '../database/supabase.service'
 
 // ─── 프롬프트 ────────────────────────────────────────────────────────────────
 
-const QUERY_ANALYSIS_PROMPT = `당신은 보드게임 룰북 검색 전문가입니다.
-사용자의 질문을 분석하여 룰북에서 검색할 쿼리를 만드세요.
+const CATEGORIES: Record<string, string> = {
+  my_turn: '내 턴에 할 수 있는 행동과 선택지',
+  opp_turn: '상대 턴에 대응하거나 관찰해야 할 것',
+  my_hand: '내 패 구성 및 보유 전략 활용',
+  opp_hand: '상대 패 구성 추측 및 상대 전략 대응',
+}
+
+function buildQueryAnalysisPrompt(category?: string): string {
+  const categoryContext = category && CATEGORIES[category]
+    ? `\n\n[질문 맥락]: 질문자는 "${CATEGORIES[category]}" 관점에서 묻고 있습니다. 이 관점을 검색어에 반영하세요.`
+    : ''
+
+  return `당신은 보드게임 룰북 검색 전문가입니다.
+사용자의 질문을 분석하여 룰북에서 검색할 쿼리를 만드세요.${categoryContext}
 
 규칙:
 - 구어체를 룰북 문어체로 변환하세요
@@ -24,6 +36,7 @@ const QUERY_ANALYSIS_PROMPT = `당신은 보드게임 룰북 검색 전문가입
     "룰북 검색어 3 (관련 예외/특수 규칙)"
   ]
 }`
+}
 
 const SYSTEM_PROMPT = `당신은 보드게임 룰 전문가입니다. 사용자의 질문 의도를 정확히 파악하고 룰북 내용을 기반으로 명확하게 답변하세요.
 
@@ -55,11 +68,12 @@ export class RagService {
     gameId: string,
     question: string,
     sessionId: string,
+    category?: string,
   ): AsyncIterable<{ type: 'chunk' | 'citations' | 'done'; data: unknown }> {
     const startedAt = Date.now()
 
     // 1. 질문 분석 — 의도 파악 + 검색 쿼리 다각화
-    const { intent, queries } = await this.analyzeQuery(question)
+    const { intent, queries } = await this.analyzeQuery(question, category)
     this.logger.log(`질문 의도: ${intent} | 검색 쿼리: ${queries.join(' / ')}`)
 
     // 2. 멀티 쿼리 벡터 검색 + 중복 제거
@@ -82,10 +96,12 @@ export class RagService {
       .from('games').select('extra_rules').eq('id', gameId).maybeSingle()
     const extraRules: string | null = gameData?.extra_rules ?? null
 
-    // 5. 프롬프트 조립 — 의도 명시로 LLM 집중도 향상
+    // 5. 프롬프트 조립 — 의도 + 카테고리 명시로 LLM 집중도 향상
     const chunkContext = this.buildContext(chunks)
+    const categoryLabel = category && CATEGORIES[category] ? `[질문 관점] ${CATEGORIES[category]}` : ''
     const userMessage = [
-      `[질문 의도 분석]\n${intent}`,
+      `[질문 의도]\n${intent}`,
+      categoryLabel ? `\n${categoryLabel}` : '',
       `\n[룰북 내용]\n${chunkContext}`,
       graphContext ? `\n${graphContext}` : '',
       extraRules ? `\n[추가 룰/주의사항]\n${extraRules}` : '',
@@ -123,9 +139,9 @@ export class RagService {
 
   // ── 질문 분석 ──────────────────────────────────────────────────────────────
 
-  private async analyzeQuery(question: string): Promise<{ intent: string; queries: string[] }> {
+  private async analyzeQuery(question: string, category?: string): Promise<{ intent: string; queries: string[] }> {
     try {
-      const raw = await this.openai.chat(QUERY_ANALYSIS_PROMPT, question, 400)
+      const raw = await this.openai.chat(buildQueryAnalysisPrompt(category), question, 400)
       const parsed = JSON.parse(raw) as { intent?: string; queries?: string[] }
       const queries = (parsed.queries ?? []).filter(Boolean).slice(0, 3)
       if (queries.length === 0) queries.push(question)

@@ -26,14 +26,14 @@ export async function fetchGame(id: string) {
   return res.json()
 }
 
-export async function* streamAsk(gameId: string, question: string, sessionId: string) {
+export async function* streamAsk(gameId: string, question: string, sessionId: string, category?: string) {
   const res = await fetch(`${BASE_URL}/games/${gameId}/ask`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-session-id': sessionId,
     },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, ...(category ? { category } : {}) }),
   })
 
   if (!res.ok || !res.body) throw new Error('Stream failed')

@@ -7,6 +7,7 @@ import { AzureOpenAiService } from './azure-openai.service'
 
 class AskDto {
   question!: string
+  category?: string
 }
 
 @ApiTags('rag')
@@ -29,7 +30,7 @@ export class RagController {
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('Connection', 'keep-alive')
 
-    for await (const event of this.ragService.ask(gameId, dto.question, sessionId)) {
+    for await (const event of this.ragService.ask(gameId, dto.question, sessionId, dto.category)) {
       res.write(`data: ${JSON.stringify(event)}\n\n`)
     }
 
