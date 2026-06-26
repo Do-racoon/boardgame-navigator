@@ -387,6 +387,7 @@ function GamesTab() {
   const [rulesFile, setRulesFile] = useState<File | null>(null)
   const [uploadingRules, setUploadingRules] = useState(false)
   const [generatingSetup, setGeneratingSetup] = useState(false)
+  const [setupPreview, setSetupPreview] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch(`${BASE_URL}/admin/games?deleted=false`)
@@ -396,7 +397,7 @@ function GamesTab() {
 
   function selectGame(game: Game) {
     setSelected(game); setShowChat(false); setMsg('')
-    setReingestUrl(''); setRulesFile(null)
+    setReingestUrl(''); setRulesFile(null); setSetupPreview(null)
     setEditForm({
       title_ko: game.title_ko ?? '', title_en: game.title_en ?? '',
       description: game.description ?? '', extra_rules: game.extra_rules ?? '',
@@ -473,6 +474,8 @@ function GamesTab() {
     try {
       const res = await fetch(`${BASE_URL}/admin/games/${selected.id}/generate-setup`, { method: 'POST' })
       if (!res.ok) { const e = await res.json() as { message: string }; throw new Error(e.message) }
+      const data = await res.json() as { setupGuide: string }
+      setSetupPreview(data.setupGuide)
       setMsg('✅ 세팅 가이드 생성 완료')
     } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
     finally { setGeneratingSetup(false) }
@@ -594,6 +597,17 @@ function GamesTab() {
               className="w-full rounded border border-green-300 py-1.5 text-sm text-green-700 hover:bg-green-50 disabled:opacity-40">
               {generatingSetup ? '⏳ 생성 중 (30초 소요)...' : '🎲 세팅 가이드 생성'}
             </button>
+            {setupPreview && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3 space-y-2">
+                <p className="text-xs font-medium text-green-700">미리보기</p>
+                <div className="max-h-48 overflow-y-auto space-y-1.5">
+                  {setupPreview.split('\n').filter(l => l.trim()).map((line, i) => (
+                    <p key={i} className="text-xs text-gray-700 leading-relaxed">{line}</p>
+                  ))}
+                </div>
+                <button onClick={() => setSetupPreview(null)} className="text-xs text-gray-400 hover:text-gray-600">닫기</button>
+              </div>
+            )}
             <button onClick={() => setShowChat(p => !p)}
               className="w-full rounded border py-1.5 text-xs text-gray-600 hover:bg-gray-50">
               {showChat ? '채팅 숨기기' : '💬 채팅 테스트 열기'}
