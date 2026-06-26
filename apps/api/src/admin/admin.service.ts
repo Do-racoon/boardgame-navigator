@@ -156,10 +156,19 @@ export class AdminService {
     let newText = ''
 
     if (file) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
-      const result = await pdfParse(file.buffer)
-      newText = result.text.replace(/\s+/g, ' ').trim()
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs') as {
+        getDocument: (o: object) => { promise: Promise<{ numPages: number; getPage: (n: number) => Promise<{ getTextContent: () => Promise<{ items: { str: string }[] }> }> }> }
+        GlobalWorkerOptions: { workerSrc: string }
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+      const doc = await pdfjsLib.getDocument({ data: new Uint8Array(file.buffer), useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true }).promise
+      const texts: string[] = []
+      for (let p = 1; p <= doc.numPages; p++) {
+        const page = await doc.getPage(p)
+        const content = await page.getTextContent()
+        texts.push(content.items.map((i: { str: string }) => i.str).join(' '))
+      }
+      newText = texts.join('\n').replace(/\s+/g, ' ').trim()
     }
 
     const { data: game } = await this.supabase.client.from('games').select('extra_rules').eq('id', gameId).single()
