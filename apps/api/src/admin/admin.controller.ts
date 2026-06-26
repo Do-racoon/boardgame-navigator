@@ -1,6 +1,6 @@
 import {
   Body, Controller, Delete, Get, InternalServerErrorException,
-  Param, Patch, Post, UploadedFile, UseInterceptors,
+  Param, Patch, Post, Query, UploadedFile, UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { memoryStorage } from 'multer'
@@ -41,11 +41,25 @@ export class AdminController {
 
   // ── 게임 ──────────────────────────────────────────────────────────
   @Get('games')
-  getGames() { return this.service.getGames() }
+  getGames(@Query('deleted') deleted?: string) {
+    return this.service.getGames(deleted === 'true')
+  }
 
   @Patch('games/:id')
   async updateGame(@Param('id') id: string, @Body() body: Record<string, unknown>) {
     try { return await this.service.updateGame(id, body) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
+
+  @Patch('games/:id/trash')
+  async trashGame(@Param('id') id: string) {
+    try { return await this.service.trashGame(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
+
+  @Delete('games/:id/trash')
+  async restoreGame(@Param('id') id: string) {
+    try { return await this.service.restoreGame(id) }
     catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 

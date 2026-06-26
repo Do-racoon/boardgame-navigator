@@ -106,13 +106,27 @@ export class AdminService {
 
   // ── 게임 ──────────────────────────────────────────────────────────
 
-  async getGames() {
-    const { data, error } = await this.supabase.client
+  async getGames(deleted = false) {
+    let query = this.supabase.client
       .from('games')
       .select('*, rulebooks(id, status, version)')
       .order('title_ko')
+    query = deleted ? query.not('deleted_at', 'is', null) : query.is('deleted_at', null)
+    const { data, error } = await query
     if (error) throw new Error(error.message)
     return data ?? []
+  }
+
+  async trashGame(id: string) {
+    const { error } = await this.supabase.client
+      .from('games').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+
+  async restoreGame(id: string) {
+    const { error } = await this.supabase.client
+      .from('games').update({ deleted_at: null }).eq('id', id)
+    if (error) throw new Error(error.message)
   }
 
   async updateGame(id: string, dto: Record<string, unknown>) {

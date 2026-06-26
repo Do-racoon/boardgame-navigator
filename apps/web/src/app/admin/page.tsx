@@ -6,7 +6,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v
 const ADMIN_PW = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? 'admin1234'
 
 type Status = 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'REJECTED'
-type Tab = 'submissions' | 'rejected' | 'games'
+type Tab = 'submissions' | 'rejected' | 'games' | 'trash'
 
 interface Submission {
   id: string; title_ko: string; title_en: string | null; description: string | null
@@ -22,6 +22,7 @@ interface Game {
   extra_rules: string | null; min_players: number | null; max_players: number | null
   min_play_time: number | null; max_play_time: number | null
   difficulty: number | null; genres: string[]; thumbnail_url: string | null
+  deleted_at: string | null
   rulebooks: { id: string; status: string; version: number }[]
 }
 
@@ -56,7 +57,7 @@ export default function AdminPage() {
       <div className="flex items-center gap-4 mb-6">
         <h1 className="text-xl font-bold">어드민</h1>
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {([['submissions', '신청 관리'], ['rejected', '반려 관리'], ['games', '게임 관리']] as [Tab, string][]).map(([t, label]) => (
+          {([['submissions', '신청 관리'], ['rejected', '반려 관리'], ['games', '게임 관리'], ['trash', '🗑 휴지통']] as [Tab, string][]).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
               className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${tab === t ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}>
               {label}
@@ -67,6 +68,7 @@ export default function AdminPage() {
       {tab === 'submissions' && <SubmissionsTab />}
       {tab === 'rejected' && <RejectedTab />}
       {tab === 'games' && <GamesTab />}
+      {tab === 'trash' && <TrashTab />}
     </div>
   )
 }
@@ -76,7 +78,7 @@ function SubmissionsTab() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [selected, setSelected] = useState<Submission | null>(null)
   const [note, setNote] = useState('')
-  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS' | 'DONE'>('PENDING')
+  const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'IN_PROGRESS'>('PENDING')
   const [loading, setLoading] = useState(false)
   const [testGameId, setTestGameId] = useState<string | null>(null)
   const [manualGameId, setManualGameId] = useState('')
@@ -134,7 +136,7 @@ function SubmissionsTab() {
       <div>
         {publishMsg && <div className="mb-3 rounded-lg bg-green-50 border border-green-200 px-4 py-2 text-sm text-green-700">{publishMsg}</div>}
         <div className="flex gap-2 mb-4">
-          {(['ALL', 'PENDING', 'IN_PROGRESS', 'DONE'] as const).map(s => (
+          {(['ALL', 'PENDING', 'IN_PROGRESS'] as const).map(s => (
             <button key={s} onClick={() => setFilter(s)}
               className={`rounded-lg border px-3 py-2 text-xs transition-colors ${filter === s ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>
               {s === 'ALL' ? `전체 ${allFiltered.length}` : `${STATUS_LABEL[s]} ${counts[s] ?? 0}`}
@@ -386,7 +388,7 @@ function GamesTab() {
   const [uploadingRules, setUploadingRules] = useState(false)
 
   const load = useCallback(async () => {
-    const res = await fetch(`${BASE_URL}/admin/games`)
+    const res = await fetch(`${BASE_URL}/admin/games?deleted=false`)
     setGames(await res.json())
   }, [])
   useEffect(() => { void load() }, [load])
@@ -421,10 +423,10 @@ function GamesTab() {
   }
 
   async function handleDelete() {
-    if (!selected || !confirm(`"${selected.title_ko}" 게임과 모든 룰북 데이터를 삭제합니다. 계속하시겠습니까?`)) return
+    if (!selected || !confirm(`"${selected.title_ko}" 게임을 휴지통으로 이동합니다.`)) return
     setDeleting(true)
     try {
-      const res = await fetch(`${BASE_URL}/admin/games/${selected.id}`, { method: 'DELETE' })
+      const res = await fetch(`${BASE_URL}/admin/games/${selected.id}/trash`, { method: 'PATCH' })
       if (!res.ok) throw new Error('삭제 실패')
       await load(); setSelected(null)
     } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
@@ -562,7 +564,7 @@ function GamesTab() {
               </button>
               <button onClick={() => void handleDelete()} disabled={deleting}
                 className="rounded border border-red-300 px-4 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40">
-                {deleting ? '삭제 중...' : '삭제'}
+                {deleting ? '이동 중...' : '🗑 휴지통'}
               </button>
             </div>
           </div>
@@ -608,6 +610,67 @@ function GamesTab() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── 휴지통 탭 ────────────────────────────────────────────────────────────────
+function TrashTab() {
+  const [games, setGames] = useState<Game[]>([])
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    const res = await fetch(`${BASE_URL}/admin/games?deleted=true`)
+    setGames(await res.json())
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  async function restore(id: string) {
+    setRestoring(id)
+    try {
+      await fetch(`${BASE_URL}/admin/games/${id}/trash`, { method: 'DELETE' })
+      await load()
+    } finally { setRestoring(null) }
+  }
+
+  async function hardDelete(id: string, title: string) {
+    if (!confirm(`"${title}" 게임과 모든 룰북 데이터를 영구 삭제합니다. 되돌릴 수 없습니다.`)) return
+    setDeleting(id)
+    try {
+      await fetch(`${BASE_URL}/admin/games/${id}`, { method: 'DELETE' })
+      await load()
+    } finally { setDeleting(null) }
+  }
+
+  return (
+    <div className="space-y-2 max-w-2xl">
+      <p className="text-sm text-gray-500 mb-4">휴지통 {games.length}건 — 여기서 삭제하면 DB에서 완전히 제거됩니다</p>
+      {games.length === 0 && <p className="text-sm text-gray-400 py-8 text-center">휴지통이 비어 있습니다</p>}
+      {games.map(g => (
+        <div key={g.id} className="rounded-lg border bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-gray-500">{g.title_ko}{g.title_en && <span className="text-gray-400 text-sm ml-1">({g.title_en})</span>}</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {g.min_players && `${g.min_players}~${g.max_players}인`}
+                {g.min_play_time && ` · ${g.min_play_time}~${g.max_play_time}분`}
+                {g.deleted_at && ` · 삭제: ${new Date(g.deleted_at).toLocaleDateString('ko-KR')}`}
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button onClick={() => restore(g.id)} disabled={restoring === g.id}
+                className="rounded border px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40">
+                {restoring === g.id ? '복원 중...' : '↩ 복원'}
+              </button>
+              <button onClick={() => hardDelete(g.id, g.title_ko)} disabled={deleting === g.id}
+                className="rounded bg-red-100 px-3 py-1.5 text-xs text-red-600 hover:bg-red-200 disabled:opacity-40">
+                {deleting === g.id ? '삭제 중...' : '영구 삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
