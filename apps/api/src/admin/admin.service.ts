@@ -143,7 +143,7 @@ export class AdminService {
   }
 
   async updateGame(id: string, dto: Record<string, unknown>) {
-    const allowed = ['title_ko', 'title_en', 'description', 'extra_rules', 'min_players', 'max_players', 'min_play_time', 'max_play_time', 'difficulty', 'genres']
+    const allowed = ['title_ko', 'title_en', 'description', 'extra_rules', 'setup_guide', 'min_players', 'max_players', 'min_play_time', 'max_play_time', 'difficulty', 'genres']
     const update = Object.fromEntries(Object.entries(dto).filter(([k]) => allowed.includes(k)))
     const { error } = await this.supabase.client.from('games').update(update).eq('id', id)
     if (error) throw new Error(error.message)

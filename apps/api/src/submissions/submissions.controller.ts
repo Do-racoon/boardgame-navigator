@@ -42,6 +42,13 @@ export class SubmissionsController {
     }, file) } catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 
+  @Post('correction')
+  async createCorrection(@Body() body: { gameId: string; content: string; submitterEmail?: string }) {
+    if (!body.gameId || !body.content?.trim()) throw new BadRequestException('gameId와 content는 필수입니다')
+    try { return await this.service.createCorrection({ gameId: body.gameId, content: body.content, submitterEmail: body.submitterEmail }) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
+
   @Get()
   findAll() {
     return this.service.findAll()

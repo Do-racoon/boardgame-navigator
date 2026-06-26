@@ -16,6 +16,12 @@ export interface CreateSubmissionDto {
   submitterEmail?: string | undefined
 }
 
+export interface CreateCorrectionDto {
+  gameId: string
+  content: string
+  submitterEmail?: string | undefined
+}
+
 @Injectable()
 export class SubmissionsService {
   constructor(private readonly supabase: SupabaseService) {}
@@ -59,6 +65,24 @@ export class SubmissionsService {
       .select('id')
       .single()
 
+    if (error) throw new Error(error.message)
+    return { id: data.id }
+  }
+
+  async createCorrection(dto: CreateCorrectionDto): Promise<{ id: string }> {
+    const { data, error } = await this.supabase.client
+      .from('game_submissions')
+      .insert({
+        title_ko: '[수정요청]',
+        genres: [],
+        rulebook_type: 'CORRECTION',
+        rulebook_text: dto.content,
+        submitter_email: dto.submitterEmail,
+        correction_for_game_id: dto.gameId,
+        status: 'PENDING',
+      })
+      .select('id')
+      .single()
     if (error) throw new Error(error.message)
     return { id: data.id }
   }

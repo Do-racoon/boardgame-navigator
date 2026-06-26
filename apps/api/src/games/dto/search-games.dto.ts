@@ -3,6 +3,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger'
 export class SearchGamesDto {
   @ApiPropertyOptional() q?: string
   @ApiPropertyOptional() genreId?: string
+  @ApiPropertyOptional() genre?: string
   @ApiPropertyOptional({ type: Number }) minPlayers?: number
   @ApiPropertyOptional({ type: Number }) maxPlayers?: number
   @ApiPropertyOptional({ type: Number }) maxPlayTime?: number

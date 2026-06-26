@@ -363,13 +363,13 @@ function TestChat({ gameId }: { gameId: string }) {
 
 // ─── 게임 관리 탭 ─────────────────────────────────────────────────────────────
 type EditForm = {
-  title_ko: string; title_en: string; description: string; extra_rules: string
+  title_ko: string; title_en: string; description: string; extra_rules: string; setup_guide: string
   min_players: number | ''; max_players: number | ''; min_play_time: number | ''
   max_play_time: number | ''; difficulty: number | ''; genres: string[]
 }
 
 const EMPTY_FORM: EditForm = {
-  title_ko: '', title_en: '', description: '', extra_rules: '',
+  title_ko: '', title_en: '', description: '', extra_rules: '', setup_guide: '',
   min_players: '', max_players: '', min_play_time: '', max_play_time: '', difficulty: '', genres: [],
 }
 
@@ -400,7 +400,7 @@ function GamesTab() {
     setReingestUrl(''); setRulesFile(null); setSetupPreview(null)
     setEditForm({
       title_ko: game.title_ko ?? '', title_en: game.title_en ?? '',
-      description: game.description ?? '', extra_rules: game.extra_rules ?? '',
+      description: game.description ?? '', extra_rules: game.extra_rules ?? '', setup_guide: (game as { setup_guide?: string }).setup_guide ?? '',
       min_players: game.min_players ?? '', max_players: game.max_players ?? '',
       min_play_time: game.min_play_time ?? '', max_play_time: game.max_play_time ?? '',
       difficulty: game.difficulty ?? '', genres: game.genres ?? [],
@@ -476,7 +476,8 @@ function GamesTab() {
       if (!res.ok) { const e = await res.json() as { message: string }; throw new Error(e.message) }
       const data = await res.json() as { setupGuide: string }
       setSetupPreview(data.setupGuide)
-      setMsg('✅ 세팅 가이드 생성 완료')
+      set('setup_guide', data.setupGuide)
+      setMsg('✅ 세팅 가이드 생성 완료 — 아래에서 수정 후 저장하세요')
     } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
     finally { setGeneratingSetup(false) }
   }
@@ -542,8 +543,16 @@ function GamesTab() {
             <div>
               <label className="text-xs text-gray-500">추가 룰 / 주의사항 <span className="text-gray-400">(AI 답변에 자동 반영)</span></label>
               <textarea value={editForm.extra_rules} onChange={e => set('extra_rules', e.target.value)}
-                rows={4} placeholder="예) 이 게임은 한국판 기준입니다. 폭탄은 상대팀 폭탄보다 작은 경우 막을 수 없습니다..."
+                rows={3} placeholder="예) 이 게임은 한국판 기준입니다..."
                 className="w-full rounded border px-2 py-1.5 text-sm mt-0.5 resize-none focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+            </div>
+
+            <div>
+              <label className="text-xs text-gray-500">세팅 가이드 <span className="text-gray-400">(게임 상세 페이지에 표시)</span></label>
+              <textarea value={editForm.setup_guide} onChange={e => set('setup_guide', e.target.value)}
+                rows={6} placeholder={"1. 카드 분리\n각 플레이어에게 카드를 나눠줍니다.\n\n2. 시작 플레이어 결정\n가위바위보로 시작 플레이어를 정합니다."}
+                className="w-full rounded border px-2 py-1.5 text-sm mt-0.5 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+              <p className="text-xs text-gray-400 mt-0.5">형식: &quot;1. 제목&quot; 다음 줄에 내용을 적으면 단계로 분리됩니다</p>
             </div>
 
             <div className="grid grid-cols-2 gap-2">

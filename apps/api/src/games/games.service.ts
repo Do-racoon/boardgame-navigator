@@ -7,7 +7,7 @@ export class GamesService {
   constructor(private readonly supabase: SupabaseService) {}
 
   async search(dto: SearchGamesDto) {
-    const { q, minPlayers, maxPlayers, maxPlayTime, maxDifficulty, page = 1, limit = 20 } = dto
+    const { q, genre, minPlayers, maxPlayers, maxPlayTime, maxDifficulty, page = 1, limit = 20 } = dto
 
     let query = this.supabase.client
       .from('games')
@@ -17,6 +17,7 @@ export class GamesService {
       .order('title_ko')
 
     if (q) query = query.or(`title_ko.ilike.%${q}%,title_en.ilike.%${q}%`)
+    if (genre) query = query.contains('genres', [genre])
     if (minPlayers) query = query.gte('max_players', minPlayers)
     if (maxPlayers) query = query.lte('min_players', maxPlayers)
     if (maxPlayTime) query = query.lte('min_play_time', maxPlayTime)
