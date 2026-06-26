@@ -386,6 +386,7 @@ function GamesTab() {
   const [rulesMode, setRulesMode] = useState<'replace' | 'append'>('replace')
   const [rulesFile, setRulesFile] = useState<File | null>(null)
   const [uploadingRules, setUploadingRules] = useState(false)
+  const [generatingSetup, setGeneratingSetup] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch(`${BASE_URL}/admin/games?deleted=false`)
@@ -464,6 +465,17 @@ function GamesTab() {
       setMsg(`✅ 추가 룰 업로드 완료`)
     } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
     finally { setUploadingRules(false) }
+  }
+
+  async function handleGenerateSetup() {
+    if (!selected) return
+    setGeneratingSetup(true); setMsg('')
+    try {
+      const res = await fetch(`${BASE_URL}/admin/games/${selected.id}/generate-setup`, { method: 'POST' })
+      if (!res.ok) { const e = await res.json() as { message: string }; throw new Error(e.message) }
+      setMsg('✅ 세팅 가이드 생성 완료')
+    } catch (e) { setMsg(`❌ ${(e as Error).message}`) }
+    finally { setGeneratingSetup(false) }
   }
 
   return (
@@ -577,6 +589,10 @@ function GamesTab() {
             <button onClick={() => void handleReingest()} disabled={reingesting || !reingestUrl.trim()}
               className="w-full rounded border border-orange-300 py-1.5 text-sm text-orange-700 hover:bg-orange-50 disabled:opacity-40">
               {reingesting ? '⏳ Ingest 중...' : '🔄 룰북 재ingestion'}
+            </button>
+            <button onClick={() => void handleGenerateSetup()} disabled={generatingSetup}
+              className="w-full rounded border border-green-300 py-1.5 text-sm text-green-700 hover:bg-green-50 disabled:opacity-40">
+              {generatingSetup ? '⏳ 생성 중 (30초 소요)...' : '🎲 세팅 가이드 생성'}
             </button>
             <button onClick={() => setShowChat(p => !p)}
               className="w-full rounded border py-1.5 text-xs text-gray-600 hover:bg-gray-50">

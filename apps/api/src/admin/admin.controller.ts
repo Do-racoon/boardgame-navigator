@@ -69,6 +69,12 @@ export class AdminController {
     catch (e) { throw new InternalServerErrorException((e as Error).message) }
   }
 
+  @Post('games/:id/generate-setup')
+  async generateSetup(@Param('id') id: string) {
+    try { return await this.service.generateSetupGuide(id) }
+    catch (e) { throw new InternalServerErrorException((e as Error).message) }
+  }
+
   @Post('games/:id/reingest')
   async reingest(@Param('id') id: string, @Body() body: { fileUrl: string }) {
     try { return await this.service.reingestGame(id, body.fileUrl) }

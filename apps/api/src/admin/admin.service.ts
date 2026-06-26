@@ -2,12 +2,25 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { randomUUID } from 'crypto'
 import { SupabaseService } from '../database/supabase.service'
 import { AdminIngestService } from './admin-ingest.service'
+import { AzureOpenAiService } from '../rag/azure-openai.service'
+
+const SETUP_GUIDE_PROMPT = `당신은 보드게임 세팅 전문가입니다.
+아래 룰북 내용을 바탕으로 게임 시작 전 준비 단계를 정리해주세요.
+
+요구사항:
+- 게임 세팅/준비 과정에 해당하는 내용만 정리
+- 플레이어가 게임 시작 전에 해야 할 일을 순서대로 작성
+- 각 단계는 "번호. 제목\n내용" 형식으로 작성
+- 5~10단계로 요약
+- 한국어로 작성
+- 세팅과 무관한 룰(점수 계산, 카드 효과 등)은 제외`
 
 @Injectable()
 export class AdminService {
   constructor(
     private readonly supabase: SupabaseService,
     private readonly ingest: AdminIngestService,
+    private readonly openai: AzureOpenAiService,
   ) {}
 
   // ── 신청 ──────────────────────────────────────────────────────────
@@ -178,5 +191,42 @@ export class AdminService {
     const { error } = await this.supabase.client.from('games').update({ extra_rules: extraRules }).eq('id', gameId)
     if (error) throw new Error(error.message)
     return { extraRules }
+  }
+
+  async generateSetupGuide(gameId: string): Promise<{ setupGuide: string }> {
+    // 세팅 관련 청크를 키워드로 검색
+    const setupKeywords = ['준비', '세팅', '설치', '시작', '배치', '나눠', '카드 분배', '게임 준비', '초기']
+    const { data: chunks } = await this.supabase.client
+      .from('rulebook_chunks')
+      .select('content, page_number, chunk_index')
+      .eq('game_id', gameId)
+      .or(setupKeywords.map(k => `content.ilike.%${k}%`).join(','))
+      .order('chunk_index')
+      .limit(15)
+
+    // 검색 결과가 적으면 앞부분 청크로 보완 (룰북 앞쪽에 세팅이 있는 경우)
+    let context = (chunks ?? []).map(c => c.content).join('\n\n')
+    if ((chunks ?? []).length < 3) {
+      const { data: frontChunks } = await this.supabase.client
+        .from('rulebook_chunks')
+        .select('content')
+        .eq('game_id', gameId)
+        .order('chunk_index')
+        .limit(10)
+      context = (frontChunks ?? []).map(c => c.content).join('\n\n')
+    }
+
+    if (!context.trim()) throw new Error('룰북 청크가 없습니다. 먼저 Ingest를 실행하세요.')
+
+    // JSON 모드 없이 일반 텍스트 생성
+    const stream = this.openai.streamChat(SETUP_GUIDE_PROMPT, `[룰북 내용]\n${context}`)
+    let setupGuide = ''
+    for await (const token of stream) {
+      setupGuide += token
+    }
+
+    const { error } = await this.supabase.client.from('games').update({ setup_guide: setupGuide.trim() }).eq('id', gameId)
+    if (error) throw new Error(error.message)
+    return { setupGuide: setupGuide.trim() }
   }
 }
