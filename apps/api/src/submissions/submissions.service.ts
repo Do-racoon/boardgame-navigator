@@ -14,6 +14,7 @@ export interface CreateSubmissionDto {
   rulebookType: 'PDF' | 'IMAGE' | 'TEXT'
   rulebookText?: string | undefined
   submitterEmail?: string | undefined
+  youtubeUrl?: string | undefined
 }
 
 export interface CreateCorrectionDto {
@@ -26,24 +27,28 @@ export interface CreateCorrectionDto {
 export class SubmissionsService {
   constructor(private readonly supabase: SupabaseService) {}
 
-  async create(dto: CreateSubmissionDto, file?: Express.Multer.File): Promise<{ id: string }> {
-    let rulebookUrl: string | undefined
+  private async uploadFile(file: Express.Multer.File, prefix: string): Promise<string> {
+    const ext = file.originalname.split('.').pop()
+    const path = `${prefix}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+    const { error } = await this.supabase.client.storage
+      .from('rulebook-submissions')
+      .upload(path, file.buffer, { contentType: file.mimetype })
+    if (error) throw new Error(`업로드 실패: ${error.message}`)
+    const { data } = this.supabase.client.storage.from('rulebook-submissions').getPublicUrl(path)
+    return data.publicUrl
+  }
 
-    if (file) {
-      const ext = file.originalname.split('.').pop()
-      const path = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
-
-      const { error: uploadError } = await this.supabase.client.storage
-        .from('rulebook-submissions')
-        .upload(path, file.buffer, { contentType: file.mimetype })
-
-      if (uploadError) throw new Error(`파일 업로드 실패: ${uploadError.message}`)
-
-      const { data } = this.supabase.client.storage
-        .from('rulebook-submissions')
-        .getPublicUrl(path)
-      rulebookUrl = data.publicUrl
-    }
+  async create(
+    dto: CreateSubmissionDto,
+    rulebookFile?: Express.Multer.File,
+    thumbnailFile?: Express.Multer.File,
+    setupImageFile?: Express.Multer.File,
+  ): Promise<{ id: string }> {
+    const [rulebookUrl, thumbnailUrl, setupImageUrl] = await Promise.all([
+      rulebookFile ? this.uploadFile(rulebookFile, 'rulebooks') : undefined,
+      thumbnailFile ? this.uploadFile(thumbnailFile, 'thumbnails') : undefined,
+      setupImageFile ? this.uploadFile(setupImageFile, 'setup-images') : undefined,
+    ])
 
     const { data, error } = await this.supabase.client
       .from('game_submissions')
@@ -61,6 +66,9 @@ export class SubmissionsService {
         rulebook_url: rulebookUrl,
         rulebook_text: dto.rulebookText,
         submitter_email: dto.submitterEmail,
+        thumbnail_url: thumbnailUrl,
+        youtube_url: dto.youtubeUrl || null,
+        setup_image_url: setupImageUrl,
       })
       .select('id')
       .single()
